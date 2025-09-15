@@ -10,7 +10,7 @@ A sophisticated conversational AI voice bot built with NestJS, TypeScript, and T
 - **Customer Support**: Intelligent call routing and support transfer
 - **Working Hours**: Automated business hours information
 - **Error Handling**: Robust fallback mechanisms with retry logic
-- **Database Integration**: SQLite with TypeORM for persistent data storage
+- **Database Integration**: PostgreSQL with TypeORM for persistent data storage
 - **OpenAI Integration**: Advanced NLP for better intent recognition
 - **Swagger Documentation**: Complete API documentation
 - **Docker Support**: Containerized deployment ready
@@ -18,7 +18,7 @@ A sophisticated conversational AI voice bot built with NestJS, TypeScript, and T
 ## 🛠️ Tech Stack
 
 - **Backend**: NestJS, TypeScript
-- **Database**: SQLite with TypeORM
+- **Database**: PostgreSQL with TypeORM
 - **Voice**: Twilio Voice API
 - **AI**: OpenAI GPT for advanced NLP
 - **Testing**: Jest
@@ -29,6 +29,7 @@ A sophisticated conversational AI voice bot built with NestJS, TypeScript, and T
 
 - Node.js 18+ 
 - npm or yarn
+- PostgreSQL 12+ (or Docker)
 - Twilio account with Voice API access
 - OpenAI API key (optional, for advanced NLP)
 
@@ -64,10 +65,31 @@ A sophisticated conversational AI voice bot built with NestJS, TypeScript, and T
    COMPANY_NAME=Your Company Name
    PORT=3000
    NODE_ENV=development
+
+   # PostgreSQL Database Configuration
+   DATABASE_HOST=localhost
+   DATABASE_PORT=5432
+   DATABASE_USERNAME=postgres
+   DATABASE_PASSWORD=password
+   DATABASE_NAME=voice_bot
    ```
 
 4. **Database Setup**
-   The SQLite database will be created automatically when you start the application.
+   
+   **Option 1: Using Docker (Recommended)**
+   ```bash
+   docker-compose up -d postgres
+   ```
+   
+   **Option 2: Local PostgreSQL Installation**
+   ```bash
+   # Install PostgreSQL (macOS)
+   brew install postgresql
+   brew services start postgresql
+   
+   # Create database
+   createdb voice_bot
+   ```
 
 ## 🚀 Running the Application
 
