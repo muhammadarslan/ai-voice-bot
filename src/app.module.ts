@@ -2,8 +2,11 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { VoiceBotModule } from './voice-bot/voice-bot.module';
-import { BookingModule } from './booking/booking.module';
 import { TwilioModule } from './twilio/twilio.module';
+import { BookingModule } from './booking/booking.module';
+import { RedisModule } from './redis/redis.module';
+import { SessionModule } from './session/session.module';
+import { Booking } from './booking/entities/booking.entity';
 
 @Module({
   imports: [
@@ -22,8 +25,10 @@ import { TwilioModule } from './twilio/twilio.module';
       ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
     }),
     VoiceBotModule,
-    BookingModule,
     TwilioModule,
+    BookingModule,
+    RedisModule,
+    SessionModule,
   ],
 })
 export class AppModule {}

@@ -25,13 +25,25 @@ A sophisticated conversational AI voice bot built with NestJS, TypeScript, and T
 - **Documentation**: Swagger/OpenAPI
 - **Deployment**: Docker, Docker Compose
 
+## 🏗️ Architecture
+
+The application follows a modular NestJS architecture:
+
+- **VoiceBotModule**: Core conversation logic and call flow management
+- **TwilioModule**: Twilio Voice API integration and TwiML generation
+- **BookingModule**: Appointment booking and database operations
+- **SessionModule**: Call session state management with Redis
+- **RedisModule**: Redis connection and session storage operations
+- **ConfigModule**: Environment configuration management
+
 ## 📋 Prerequisites
 
-- Node.js 18+ 
+- Node.js (v18 or higher)
 - npm or yarn
-- PostgreSQL 12+ (or Docker)
+- PostgreSQL database
+- Redis server (for session management)
 - Twilio account with Voice API access
-- OpenAI API key (optional, for advanced NLP)
+- OpenAI API key (optional, for advanced NLP features)
 
 ## 🔧 Installation
 
@@ -79,16 +91,33 @@ A sophisticated conversational AI voice bot built with NestJS, TypeScript, and T
    **Option 1: Using Docker (Recommended)**
    ```bash
    docker-compose up -d postgres
-   ```
-   
-   **Option 2: Local PostgreSQL Installation**
-   ```bash
-   # Install PostgreSQL (macOS)
-   brew install postgresql
-   brew services start postgresql
-   
    # Create database
    createdb voice_bot
+   
+   # Or using psql
+   psql -U postgres
+   CREATE DATABASE voice_bot;
+   \q
+   ```
+
+5. **Set up Redis server**
+   ```bash
+   # Install Redis (macOS with Homebrew)
+   brew install redis
+   brew services start redis
+   
+   # Install Redis (Ubuntu/Debian)
+   sudo apt update
+   sudo apt install redis-server
+   sudo systemctl start redis-server
+   
+   # Install Redis (CentOS/RHEL)
+   sudo yum install redis
+   sudo systemctl start redis
+   
+   # Test Redis connection
+   redis-cli ping
+   # Should return: PONG
    ```
 
 ## 🚀 Running the Application
@@ -232,16 +261,16 @@ private getMenuOptions() {
 
 ## 🚀 Deployment
 
-### Docker Deployment
+### Using Docker Compose (Recommended)
 ```bash
-# Build and run
+# Start all services (app, PostgreSQL, Redis)
 docker-compose up -d
 
 # View logs
 docker-compose logs -f
 
-# Scale if needed
-docker-compose up -d --scale ai-voice-bot=2
+# Stop services
+docker-compose down
 ```
 
 ### Production Considerations

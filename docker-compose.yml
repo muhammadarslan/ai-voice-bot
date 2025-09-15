@@ -13,10 +13,12 @@ services:
       - DATABASE_USERNAME=postgres
       - DATABASE_PASSWORD=password
       - DATABASE_NAME=voice_bot
+      - REDIS_URL=redis://redis:6379
     env_file:
       - .env
     depends_on:
       - postgres
+      - redis
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api"]

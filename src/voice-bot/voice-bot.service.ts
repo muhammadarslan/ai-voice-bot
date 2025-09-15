@@ -2,19 +2,20 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TwilioService } from '../twilio/twilio.service';
 import { BookingService } from '../booking/booking.service';
+import { SessionService } from '../session/session.service';
 import { CallSession, CallState, MenuOption, BookingData } from '../common/interfaces/call-session.interface';
 import { v4 as uuidv4 } from 'uuid';
 import OpenAI from 'openai';
 
 @Injectable()
 export class VoiceBotService {
-  private callSessions: Map<string, CallSession> = new Map();
   private openai: OpenAI;
 
   constructor(
     private configService: ConfigService,
     private twilioService: TwilioService,
     private bookingService: BookingService,
+    private sessionService: SessionService,
   ) {
     const openaiApiKey = this.configService.get<string>('OPENAI_API_KEY');
     if (openaiApiKey) {
@@ -47,21 +48,8 @@ export class VoiceBotService {
     };
   }
 
-  private getSessionData(callSid: string): CallSession {
-    if (!this.callSessions.has(callSid)) {
-      this.callSessions.set(callSid, {
-        callSid,
-        state: CallState.GREETING,
-        retryCount: 0,
-        bookingData: {},
-        language: 'english',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-    }
-    const session = this.callSessions.get(callSid);
-    session.updatedAt = new Date();
-    return session;
+  private async getSessionData(callSid: string): Promise<CallSession> {
+    return await this.sessionService.getSession(callSid);
   }
 
   private async parseUserInput(userInput: string, context: string = 'menu'): Promise<MenuOption | string> {
@@ -115,8 +103,8 @@ export class VoiceBotService {
   }
 
   async handleGreeting(callSid: string): Promise<string> {
-    const session = this.getSessionData(callSid);
-    session.state = CallState.MAIN_MENU;
+    const session = await this.getSessionData(callSid);
+    await this.sessionService.updateSession(callSid, { state: CallState.MAIN_MENU });
 
     const companyName = this.configService.get<string>('COMPANY_NAME', 'Your Company');
     const message = `Hello! Welcome to ${companyName}. I'm your virtual assistant. Please choose from the following options: ` +
@@ -137,7 +125,7 @@ export class VoiceBotService {
   }
 
   async handleMenuChoice(userInput: string, callSid: string): Promise<string> {
-    const session = this.getSessionData(callSid);
+    const session = await this.getSessionData(callSid);
     const intent = await this.parseUserInput(userInput);
 
     switch (intent) {
@@ -159,8 +147,8 @@ export class VoiceBotService {
   }
 
   async handleBookAppointment(callSid: string): Promise<string> {
-    const session = this.getSessionData(callSid);
-    session.state = CallState.BOOKING_DATE;
+    const session = await this.getSessionData(callSid);
+    await this.sessionService.updateSession(callSid, { state: CallState.BOOKING_DATE });
 
     const message = "I'd be happy to help you book an appointment. " +
       "Please tell me your preferred date. You can say something like 'tomorrow', 'next Monday', or a specific date like 'December 15th'.";
@@ -175,12 +163,15 @@ export class VoiceBotService {
   }
 
   async handleBookingDate(userInput: string, callSid: string): Promise<string> {
-    const session = this.getSessionData(callSid);
+    const session = await this.getSessionData(callSid);
     const dateStr = this.parseDateInput(userInput);
 
     if (dateStr) {
-      session.bookingData.date = dateStr;
-      session.state = CallState.BOOKING_TIME;
+      const updatedBookingData = { ...session.bookingData, date: dateStr };
+      await this.sessionService.updateSession(callSid, { 
+        bookingData: updatedBookingData, 
+        state: CallState.BOOKING_TIME 
+      });
 
       const message = `Great! I have ${dateStr} noted. ` +
         "What time would you prefer? You can say something like '2 PM', '10:30 AM', or 'morning'.";
@@ -207,24 +198,30 @@ export class VoiceBotService {
   }
 
   async handleBookingTime(userInput: string, callSid: string): Promise<string> {
-    const session = this.getSessionData(callSid);
+    const session = await this.getSessionData(callSid);
     const timeStr = this.parseTimeInput(userInput);
 
     if (timeStr) {
-      session.bookingData.time = timeStr;
-      session.state = CallState.BOOKING_CONFIRMATION;
-
       const bookingId = uuidv4().substring(0, 8);
-      session.bookingData.id = bookingId;
+      const updatedBookingData = { 
+        ...session.bookingData, 
+        time: timeStr, 
+        id: bookingId 
+      };
+      
+      await this.sessionService.updateSession(callSid, { 
+        bookingData: updatedBookingData, 
+        state: CallState.BOOKING_CONFIRMATION 
+      });
 
       // Store booking in database
       try {
-        await this.bookingService.createBooking(session.bookingData, callSid);
+        await this.bookingService.createBooking(updatedBookingData, callSid);
       } catch (error) {
         console.error('Error creating booking:', error);
       }
 
-      const message = `Perfect! I have scheduled your appointment for ${session.bookingData.date} at ${timeStr}. ` +
+      const message = `Perfect! I have scheduled your appointment for ${updatedBookingData.date} at ${timeStr}. ` +
         `Your booking ID is ${bookingId}. ` +
         "Is this correct? Say 'yes' to confirm or 'no' to make changes.";
 
@@ -250,7 +247,7 @@ export class VoiceBotService {
   }
 
   async handleBookingConfirmation(userInput: string, callSid: string): Promise<string> {
-    const session = this.getSessionData(callSid);
+    const session = await this.getSessionData(callSid);
 
     if (userInput && ['yes', 'confirm', 'correct'].some(word => userInput.toLowerCase().includes(word))) {
       const message = "Excellent! Your appointment has been confirmed. " +
@@ -267,7 +264,7 @@ export class VoiceBotService {
       return this.twilioService.createTwiMLResponse(message, gatherOptions);
     } else {
       // Go back to date selection
-      session.state = CallState.BOOKING_DATE;
+      await this.sessionService.updateSession(callSid, { state: CallState.BOOKING_DATE });
       const message = "No problem! Let's start over. What date would you prefer for your appointment?";
 
       const gatherOptions = {
@@ -281,8 +278,8 @@ export class VoiceBotService {
   }
 
   async handleCheckBooking(callSid: string): Promise<string> {
-    const session = this.getSessionData(callSid);
-    session.state = CallState.CHECK_BOOKING;
+    const session = await this.getSessionData(callSid);
+    await this.sessionService.updateSession(callSid, { state: CallState.CHECK_BOOKING });
 
     const message = "I can help you check your booking. " +
       "Please provide your booking ID, or say your full name if you don't have the ID.";
@@ -393,10 +390,11 @@ export class VoiceBotService {
   }
 
   async handleUnknownInput(callSid: string): Promise<string> {
-    const session = this.getSessionData(callSid);
-    session.retryCount += 1;
+    const session = await this.getSessionData(callSid);
+    const newRetryCount = session.retryCount + 1;
+    await this.sessionService.updateSession(callSid, { retryCount: newRetryCount });
 
-    if (session.retryCount >= 2) {
+    if (newRetryCount >= 2) {
       const message = "I'm having trouble understanding you. Let me connect you to one of our support agents for further assistance.";
       return this.handleCustomerSupport(callSid);
     }
